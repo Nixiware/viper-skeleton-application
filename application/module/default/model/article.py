@@ -9,18 +9,21 @@ class Model:
         self.application = application
         self.dbService = self.application.getService("viper.database")
 
-    def createArticle(self, title, date, ip, successHandler = None, failHandler = None):
+    def createArticle(self,
+                      title, date, ip,
+                      successHandler=None, failHandler=None):
         createAction = self.dbService.runOperation(
-            "INSERT INTO `article` (`article_id`, `title`, `date`, `ip`) VALUES (NULL, %s, %s, %s);",
+            "INSERT INTO `article` (`article_id`, `title`, `date`, `ip`) "
+            "VALUES (NULL, %s, %s, %s);",
             (title, date.strftime("%Y-%m-%d %H:%M:%S"), ip)
         )
 
         def success(_):
-            if successHandler != None:
+            if successHandler is not None:
                 reactor.callInThread(successHandler)
 
         def fail(_):
-            if failHandler != None:
+            if failHandler is not None:
                 reactor.callInThread(failHandler)
 
         createAction.addCallbacks(success, fail)

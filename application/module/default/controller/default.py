@@ -1,4 +1,4 @@
-import time, datetime
+import datetime
 
 from nx.viper.controller import Controller as ViperController
 
@@ -15,10 +15,13 @@ class Controller(ViperController):
             self.responseCode = 400
             self.sendFinalResponse()
 
-        articleModel.createArticle(
-            self.requestParameters["title"],
-            datetime.datetime.now(),
-            self.requestProtocol.getIPAddress(),
-            successCallback,
-            failCallback
-        )
+        if self.requestVersion == 1.1:
+            articleModel.createArticle(
+                self.requestParameters["title"],
+                datetime.datetime.now(),
+                self.requestProtocol.getIPAddress(),
+                successCallback,
+                failCallback
+            )
+        else:
+            failCallback()

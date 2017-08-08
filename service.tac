@@ -1,5 +1,4 @@
-import sys, os
-#sys.path.append(".")
+import os
 
 from twisted.application import service
 
@@ -13,5 +12,6 @@ viperApplicationService = ViperApplicationTwistedService()
 viperApplicationService.setServiceParent(application)
 
 # attaching Viper application interfaces
-for interfaceName, interface in viperApplicationService.viperApplication.getInterfaces().items():
+interfaces = viperApplicationService.viperApplication.getInterfaces()
+for interfaceName, interface in interfaces.items():
     interface.setServiceParent(application)
