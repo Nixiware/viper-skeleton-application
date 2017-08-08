@@ -1,0 +1,33 @@
+{
+  "performance": {
+    "//": "Application resource usage",
+    "threadPoolSize": 3
+  },
+  "interface": {
+    "//": "Application communication interfaces",
+    "http": {
+      "port": 8001,
+      "timeout": 30
+    }
+  },
+  "mail": {
+    "//": "SMTP server used for emails",
+    "from": "",
+    "name": "",
+    "host": "",
+    "port": 0,
+    "username": "",
+    "password": ""
+  },
+  "database": {
+    "//": "MySQL database server used for local storage",
+    "host": "",
+    "port": 3306,
+    "username": "",
+    "password": "",
+    "name": "",
+    "charset": "utf8",
+    "connectionsMinimum": 3,
+    "connectionsMaximum": 5
+  }
+}
