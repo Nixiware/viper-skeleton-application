@@ -62,6 +62,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
 
     def failRequestWithErrors(self, errors):
         self.requestResponse["code"] = 400
+        self.requestResponse["content"] = None
         self.requestResponse["errors"] += errors
 
         self.sendFinalRequestResponse()
@@ -71,6 +72,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
 
     def sendFinalRequestResponse(self):
         def sendResponse():
+            # sending response and closing connection
             self.setResponseCode(200, "OK".encode())
             self.setHeader("Content-Type", "application/json")
             self.write(json.dumps(
@@ -80,6 +82,11 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
 
             self.finish()
             self.transport.loseConnection()
+
+            # clearing response
+            self.requestResponse["code"] = 200
+            self.requestResponse["content"] = None
+            self.requestResponse["errors"] = []
 
         reactor.callFromThread(sendResponse)
 
