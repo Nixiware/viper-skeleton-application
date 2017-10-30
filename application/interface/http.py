@@ -1,7 +1,7 @@
 import json
 
 from twisted.logger import Logger
-from twisted.internet import reactor
+from twisted.internet import reactor, ssl
 from twisted.application import service
 from twisted.web.http import HTTPChannel, Request, HTTPFactory
 from twisted.protocols.policies import WrappingFactory, ThrottlingFactory, LimitConnectionsByPeer
@@ -182,10 +182,29 @@ class Service(service.Service):
         connectionLimitFactory = PeerConnectionLimiter(httpThrottleFactory)
         connectionLimitFactory.maxConnectionsPerPeer = self.application.config["interface"]["http"]["connection"]["maximumByPeer"]
 
-        self._reactor = reactor.listenTCP(
-            self.application.config["interface"]["http"]["default"]["port"],
-            connectionLimitFactory
-        )
+        # starting default (unsecure) http interface
+        if self.application.config["interface"]["http"]["default"]["enabled"]:
+            self._reactor = reactor.listenTCP(
+                self.application.config["interface"]["http"]["default"]["port"],
+                connectionLimitFactory,
+                50
+            )
+
+        # starting TLS (secure) http interface
+        if self.application.config["interface"]["http"]["tls"]["enabled"]:
+            # loading certificate & private key
+            pemFile = open(self.application.config["interface"]["http"]["tls"]["pem"], "rb")
+            pemData = pemFile.read()
+            pemFile.close()
+
+            certificate = ssl.PrivateCertificate.loadPEM(pemData)
+
+            self._reactor = reactor.listenSSL(
+                self.application.config["interface"]["http"]["tls"]["port"],
+                connectionLimitFactory,
+                certificate.options(),
+                50
+            )
 
     def stopService(self):
         return self._reactor.stopListening()

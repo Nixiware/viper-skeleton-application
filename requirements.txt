@@ -1,1 +1,5 @@
 nx.viper
+pyOpenSSL
+ndg-httpsclient
+pyasn1
+service_identity
