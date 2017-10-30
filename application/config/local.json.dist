@@ -14,6 +14,7 @@
       "tls": {
         "enabled": false,
         "port": 8001,
+        "//": "pem file must be a concatenation of the certificate and the private key (in that order)",
         "pem": ""
       },
       "connection": {
