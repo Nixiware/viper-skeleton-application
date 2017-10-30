@@ -6,8 +6,21 @@
   "interface": {
     "//": "Application communication interfaces",
     "http": {
-      "port": 8001,
-      "timeout": 30
+      "ip": "127.0.0.1",
+      "default": {
+        "enabled": false,
+        "port": 8000
+      },
+      "tls": {
+        "enabled": false,
+        "port": 8001,
+        "pem": ""
+      },
+      "connection": {
+        "timeout": 30,
+        "maximum": 100,
+        "maximumByPeer": 5
+      }
     }
   },
   "mail": {

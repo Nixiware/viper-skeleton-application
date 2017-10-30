@@ -13,7 +13,7 @@ class Model:
                       title, date, ip,
                       successHandler=None, failHandler=None):
         createAction = self.dbService.runOperation(
-            "INSERT INTO `article` (`article_id`, `title`, `date`, `ip`) "
+            "INSERT INTO `article_article` (`article_id`, `title`, `date`, `ip`) "
             "VALUES (NULL, %s, %s, %s);",
             (title, date.strftime("%Y-%m-%d %H:%M:%S"), ip)
         )

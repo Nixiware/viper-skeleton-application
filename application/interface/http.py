@@ -58,6 +58,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
         return self.getClientIP()
 
     def requestPassedDispatcherValidation(self):
+        # method is called before request is passed to controller
         pass
 
     def failRequestWithErrors(self, errors):
@@ -68,6 +69,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
         self.sendFinalRequestResponse()
 
     def sendPartialRequestResponse(self):
+        # HTTP does not actually support partial response
         pass
 
     def sendFinalRequestResponse(self):
@@ -81,7 +83,6 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
             ).encode())
 
             self.finish()
-            self.transport.loseConnection()
 
             # clearing response
             self.requestResponse["code"] = 200
@@ -94,12 +95,16 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
 class HTTPProtocol(HTTPChannel):
     requestFactory = HTTPRequest
 
+    def timeoutConnection(self):
+        # preventing writing to log that a connection has been timed out as this is not an unusual issue (KeepAlive)
+        pass
+
 
 class HTTPFactory(HTTPFactory):
     def buildProtocol(self, addr):
         protocol = HTTPProtocol()
         protocol.application = self.application
-        protocol.timeOut = self.timeout
+        protocol.setTimeout(self.timeout)
 
         return protocol
 
@@ -109,15 +114,16 @@ class Service(service.Service):
         self.application = application
 
     def startService(self):
-        factory = HTTPFactory()
-        factory.application = self.application
-        factory.timeout = (
-            self.application.config["interface"]["http"]["timeout"]
+        # creating HTTP
+        httpFactory = HTTPFactory()
+        httpFactory.application = self.application
+        httpFactory.timeout = (
+            self.application.config["interface"]["http"]["connection"]["timeout"]
         )
 
         self._reactor = reactor.listenTCP(
-            self.application.config["interface"]["http"]["port"],
-            factory
+            self.application.config["interface"]["http"]["default"]["port"],
+            httpFactory
         )
 
     def stopService(self):
