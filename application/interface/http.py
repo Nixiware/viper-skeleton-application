@@ -1,10 +1,57 @@
 import json
 
+from twisted.logger import Logger
 from twisted.internet import reactor
 from twisted.application import service
 from twisted.web.http import HTTPChannel, Request, HTTPFactory
+from twisted.protocols.policies import WrappingFactory, ThrottlingFactory, LimitConnectionsByPeer
 
 from nx.viper.interface import AbstractApplicationInterfaceProtocol
+
+
+class Throttler(ThrottlingFactory):
+    """
+    MonkeyPatch
+
+    Twisted's ThrottlingFactory does not provide a method to override the automatic logging.
+    """
+    log = Logger()
+
+    def buildProtocol(self, addr):
+        if self.connectionCount == 0:
+            if self.readLimit is not None:
+                self.checkReadBandwidth()
+            if self.writeLimit is not None:
+                self.checkWriteBandwidth()
+
+        if self.connectionCount < self.maxConnectionCount:
+            self.connectionCount += 1
+            return WrappingFactory.buildProtocol(self, addr)
+        else:
+            self.log.warn("[HTTP]: Started throttling connections. Reason: maximum connection count reached.")
+            return None
+
+
+class PeerConnectionLimiter(LimitConnectionsByPeer):
+    """
+    MonkeyPatch
+
+    Twisted's LimitConnectionsByPeer handles IPv4Address/IPv6Address incorrectly which renders this policy unusable.
+    """
+
+    def buildProtocol(self, addr):
+        peerHost = addr.host
+        connectionCount = self.peerConnections.get(peerHost, 0)
+        if connectionCount >= self.maxConnectionsPerPeer:
+            return None
+        self.peerConnections[peerHost] = connectionCount + 1
+        return WrappingFactory.buildProtocol(self, addr)
+
+    def unregisterProtocol(self, p):
+        peerHost = p.getPeer().host
+        self.peerConnections[peerHost] -= 1
+        if self.peerConnections[peerHost] == 0:
+            del self.peerConnections[peerHost]
 
 
 class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
@@ -114,6 +161,10 @@ class Service(service.Service):
         self.application = application
 
     def startService(self):
+        # validating configuration
+        if self.application.config["interface"]["http"]["connection"]["maximum"] < self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
+            raise ValueError("[HTTP]: You cannot set the total number of connections allowed lower than the total connections per peer.")
+
         # creating HTTP
         httpFactory = HTTPFactory()
         httpFactory.application = self.application
@@ -121,9 +172,19 @@ class Service(service.Service):
             self.application.config["interface"]["http"]["connection"]["timeout"]
         )
 
+        # enabling throttle settings
+        httpThrottleFactory = Throttler(
+            httpFactory,
+            self.application.config["interface"]["http"]["connection"]["maximum"]
+        )
+
+        # enabling connection settings
+        connectionLimitFactory = PeerConnectionLimiter(httpThrottleFactory)
+        connectionLimitFactory.maxConnectionsPerPeer = self.application.config["interface"]["http"]["connection"]["maximumByPeer"]
+
         self._reactor = reactor.listenTCP(
             self.application.config["interface"]["http"]["default"]["port"],
-            httpFactory
+            connectionLimitFactory
         )
 
     def stopService(self):
