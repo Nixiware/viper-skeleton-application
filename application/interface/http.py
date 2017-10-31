@@ -1,15 +1,54 @@
 import json
 
+from zope.interface import directlyProvides, providedBy
+
 from twisted.logger import Logger
 from twisted.internet import reactor, ssl
 from twisted.application import service
 from twisted.web.http import HTTPChannel, Request, HTTPFactory
-from twisted.protocols.policies import WrappingFactory, ThrottlingFactory, LimitConnectionsByPeer, TimeoutFactory
+from twisted.protocols.policies import Protocol, ProtocolWrapper, WrappingFactory, ThrottlingFactory, LimitConnectionsByPeer, TimeoutFactory
 
 from nx.viper.interface import AbstractApplicationInterfaceProtocol
 
 
-class Throttler(ThrottlingFactory):
+class PatchedProtocolWrapper(ProtocolWrapper):
+    """
+    MonkeyPatch
+
+    The HTTP interface implements multiple policies (Throttling, LimitConnectionsByPeer, Timeout)
+    in order to keep the server resources in check and prevent DoS attacks.
+    These policies are daisy chained around the HTTPFactory and the connection must pass each one
+    before it reaches the HTTPFactory.
+    Unfortunately if one of the policies cancels the connection, the rest of the chain is not notified.
+
+    This worsens the situation because Twisted's ProtocolWrapper does not check if the wrappedProtocol
+    actually exists, further polluting the log with unhandled exceptions.
+    """
+    def makeConnection(self, transport):
+        directlyProvides(self, providedBy(transport))
+        Protocol.makeConnection(self, transport)
+        self.factory.registerProtocol(self)
+
+        if self.wrappedProtocol is not None:
+            self.wrappedProtocol.makeConnection(self)
+
+    def dataReceived(self, data):
+        if self.wrappedProtocol is not None:
+            self.wrappedProtocol.dataReceived(data)
+
+    def connectionLost(self, reason):
+        self.factory.unregisterProtocol(self)
+        if self.wrappedProtocol is not None:
+            self.wrappedProtocol.connectionLost(reason)
+
+
+# applying the patch for ProtocolWrapper
+ProtocolWrapper.makeConnection = PatchedProtocolWrapper.makeConnection
+ProtocolWrapper.dataReceived = PatchedProtocolWrapper.dataReceived
+ProtocolWrapper.connectionLost = PatchedProtocolWrapper.connectionLost
+
+
+class PatchedThrottlingFactory(ThrottlingFactory):
     """
     MonkeyPatch
 
@@ -32,13 +71,17 @@ class Throttler(ThrottlingFactory):
             return None
 
 
-class PeerConnectionLimiter(LimitConnectionsByPeer):
+# applying the patch for ThrottlingFactory
+ThrottlingFactory.log = Logger()
+ThrottlingFactory.buildProtocol = PatchedThrottlingFactory.buildProtocol
+
+
+class PatchedLimitConnectionsByPeer(LimitConnectionsByPeer):
     """
     MonkeyPatch
 
     Twisted's LimitConnectionsByPeer handles IPv4Address/IPv6Address incorrectly which renders this policy unusable.
     """
-
     def buildProtocol(self, addr):
         peerHost = addr.host
         connectionCount = self.peerConnections.get(peerHost, 0)
@@ -54,7 +97,14 @@ class PeerConnectionLimiter(LimitConnectionsByPeer):
             del self.peerConnections[peerHost]
 
 
+# applying patch for LimitConnectionsByPeer
+LimitConnectionsByPeer.buildProtocol = PatchedLimitConnectionsByPeer.buildProtocol
+LimitConnectionsByPeer.unregisterProtocol = PatchedLimitConnectionsByPeer.unregisterProtocol
+
+
 class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
+    log = Logger()
+
     def process(self):
         reactor.callInThread(self.parseRequest)
 
@@ -120,32 +170,40 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
         pass
 
     def sendFinalRequestResponse(self):
-        def sendResponseCallback():
-            # sending response and closing connection
-            self.setResponseCode(200, "OK".encode())
-            self.setHeader("Content-Type", "application/json")
-            self.write(json.dumps(
-                self.requestResponse,
-                sort_keys=True
-            ).encode())
-
-            # preparing request finish
-            keepAlive = True
-            if self.channel.application.config["interface"]["http"]["connection"]["keepAlive"] == 0:
-                keepAlive = False
-
-            self.finish()
-            if not keepAlive:
-                self.transport.loseConnection()
-
+        def clearResponseCallback():
             # clearing response
             self.requestResponse["code"] = 200
             self.requestResponse["content"] = None
             self.requestResponse["errors"] = []
 
+        def sendResponseCallback():
+            try:
+                # sending response and closing connection
+                self.setResponseCode(200, "OK".encode())
+                self.setHeader("Content-Type", "application/json")
+                self.write(json.dumps(
+                    self.requestResponse,
+                    sort_keys=True
+                ).encode())
+
+                # preparing request finish
+                keepAlive = True
+                if self.channel.application.config["interface"]["http"]["connection"]["keepAlive"] == 0:
+                    keepAlive = False
+
+                self.finish()
+                if not keepAlive:
+                    self.transport.loseConnection()
+            except Exception as e:
+                self.log.debug("[HTTP]: Exception encountered while responding to request.")
+
+            clearResponseCallback()
+
         # checking if any of the enabled policies closed the channel
         if self.channel is not None:
             reactor.callFromThread(sendResponseCallback)
+        else:
+            clearResponseCallback()
 
 
 class HTTPProtocol(HTTPChannel):
@@ -154,7 +212,12 @@ class HTTPProtocol(HTTPChannel):
     def timeoutConnection(self):
         """
         Overriding HTTPChannel timeoutConnection to prevent logging pollution.
-        If KeepAlive is used then every connection will be timed out at some point, which renders logging this event totally useless.
+
+        If KeepAlive is used then every connection will be timed out at some point, which renders
+        logging this event totally useless.
+
+        Also by default the connection is not dropped when a timeout occurs, this method ensures
+        that the request is completely cleared from the queue.
         """
         if self.abortTimeout is not None:
             # We use self.callLater because that's what TimeoutMixin does.
@@ -162,6 +225,14 @@ class HTTPProtocol(HTTPChannel):
                 self.abortTimeout, self.forceAbortClient
             )
         self.loseConnection()
+        self.forceAbortClient()
+
+    def forceAbortClient(self):
+        """
+        Overriding HTTPChannel forceAbortClient to prevent logging pollution.
+        """
+        self._abortingCall = None
+        self.transport.abortConnection()
 
 
 class HTTPFactory(HTTPFactory):
@@ -172,7 +243,12 @@ class HTTPFactory(HTTPFactory):
         if self.keepAlive > 0:
             protocol.setTimeout(self.keepAlive)
         else:
-            protocol.setTimeout(None)
+            """
+            According to Twisted's docs, in order to disable the timeout we need to set it to None.
+            However setting it to None while using reactor.listenSSL reveals a bug where 
+            subsequent requests are left in timeout.
+            """
+            protocol.setTimeout(0.1)
 
         return protocol
 
@@ -183,8 +259,8 @@ class Service(service.Service):
 
     def startService(self):
         # validating configuration
-        if self.application.config["interface"]["http"]["connection"]["maximum"] < self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
-            raise ValueError("[HTTP]: You cannot set the total number of connections allowed lower than the total connections per peer.")
+        #if self.application.config["interface"]["http"]["connection"]["maximum"] < self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
+        #    raise ValueError("[HTTP]: You cannot set the total number of connections allowed lower than the total connections per peer.")
 
         # creating HTTP factory
         httpFactory = HTTPFactory()
@@ -193,7 +269,7 @@ class Service(service.Service):
             self.application.config["interface"]["http"]["connection"]["keepAlive"]
         )
 
-        # enabling timeout settings
+        # enabling timeout policy
         if self.application.config["interface"]["http"]["connection"]["timeout"] > 0:
             httpTimeoutFactory = TimeoutFactory(
                 httpFactory,
@@ -202,12 +278,12 @@ class Service(service.Service):
         else:
             httpTimeoutFactory = httpFactory
 
-        # enabling connection settings
-        httpConnectionLimitFactory = PeerConnectionLimiter(httpTimeoutFactory)
+        # enabling connection peer limit policy
+        httpConnectionLimitFactory = LimitConnectionsByPeer(httpTimeoutFactory)
         httpConnectionLimitFactory.maxConnectionsPerPeer = self.application.config["interface"]["http"]["connection"]["maximumByPeer"]
 
-        # enabling throttle settings
-        httpThrottleFactory = Throttler(
+        # enabling throttle policy
+        httpThrottleFactory = ThrottlingFactory(
             httpConnectionLimitFactory,
             self.application.config["interface"]["http"]["connection"]["maximum"]
         )
