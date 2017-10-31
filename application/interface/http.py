@@ -4,7 +4,7 @@ from twisted.logger import Logger
 from twisted.internet import reactor, ssl
 from twisted.application import service
 from twisted.web.http import HTTPChannel, Request, HTTPFactory
-from twisted.protocols.policies import WrappingFactory, ThrottlingFactory, LimitConnectionsByPeer
+from twisted.protocols.policies import WrappingFactory, ThrottlingFactory, LimitConnectionsByPeer, TimeoutFactory
 
 from nx.viper.interface import AbstractApplicationInterfaceProtocol
 
@@ -120,7 +120,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
         pass
 
     def sendFinalRequestResponse(self):
-        def sendResponse():
+        def sendResponseCallback():
             # sending response and closing connection
             self.setResponseCode(200, "OK".encode())
             self.setHeader("Content-Type", "application/json")
@@ -129,29 +129,50 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
                 sort_keys=True
             ).encode())
 
+            # preparing request finish
+            keepAlive = True
+            if self.channel.application.config["interface"]["http"]["connection"]["keepAlive"] == 0:
+                keepAlive = False
+
             self.finish()
+            if not keepAlive:
+                self.transport.loseConnection()
 
             # clearing response
             self.requestResponse["code"] = 200
             self.requestResponse["content"] = None
             self.requestResponse["errors"] = []
 
-        reactor.callFromThread(sendResponse)
+        # checking if any of the enabled policies closed the channel
+        if self.channel is not None:
+            reactor.callFromThread(sendResponseCallback)
 
 
 class HTTPProtocol(HTTPChannel):
     requestFactory = HTTPRequest
 
     def timeoutConnection(self):
-        # preventing writing to log that a connection has been timed out as this is not an unusual issue (KeepAlive)
-        pass
+        """
+        Overriding HTTPChannel timeoutConnection to prevent logging pollution.
+        If KeepAlive is used then every connection will be timed out at some point, which renders logging this event totally useless.
+        """
+        if self.abortTimeout is not None:
+            # We use self.callLater because that's what TimeoutMixin does.
+            self._abortingCall = self.callLater(
+                self.abortTimeout, self.forceAbortClient
+            )
+        self.loseConnection()
 
 
 class HTTPFactory(HTTPFactory):
     def buildProtocol(self, addr):
         protocol = HTTPProtocol()
         protocol.application = self.application
-        protocol.setTimeout(self.timeout)
+
+        if self.keepAlive > 0:
+            protocol.setTimeout(self.keepAlive)
+        else:
+            protocol.setTimeout(None)
 
         return protocol
 
@@ -165,28 +186,37 @@ class Service(service.Service):
         if self.application.config["interface"]["http"]["connection"]["maximum"] < self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
             raise ValueError("[HTTP]: You cannot set the total number of connections allowed lower than the total connections per peer.")
 
-        # creating HTTP
+        # creating HTTP factory
         httpFactory = HTTPFactory()
         httpFactory.application = self.application
-        httpFactory.timeout = (
-            self.application.config["interface"]["http"]["connection"]["timeout"]
+        httpFactory.keepAlive = (
+            self.application.config["interface"]["http"]["connection"]["keepAlive"]
         )
+
+        # enabling timeout settings
+        if self.application.config["interface"]["http"]["connection"]["timeout"] > 0:
+            httpTimeoutFactory = TimeoutFactory(
+                httpFactory,
+                self.application.config["interface"]["http"]["connection"]["timeout"]
+            )
+        else:
+            httpTimeoutFactory = httpFactory
+
+        # enabling connection settings
+        httpConnectionLimitFactory = PeerConnectionLimiter(httpTimeoutFactory)
+        httpConnectionLimitFactory.maxConnectionsPerPeer = self.application.config["interface"]["http"]["connection"]["maximumByPeer"]
 
         # enabling throttle settings
         httpThrottleFactory = Throttler(
-            httpFactory,
+            httpConnectionLimitFactory,
             self.application.config["interface"]["http"]["connection"]["maximum"]
         )
-
-        # enabling connection settings
-        connectionLimitFactory = PeerConnectionLimiter(httpThrottleFactory)
-        connectionLimitFactory.maxConnectionsPerPeer = self.application.config["interface"]["http"]["connection"]["maximumByPeer"]
 
         # starting default (unsecure) http interface
         if self.application.config["interface"]["http"]["default"]["enabled"]:
             self._reactor = reactor.listenTCP(
                 self.application.config["interface"]["http"]["default"]["port"],
-                connectionLimitFactory,
+                httpThrottleFactory,
                 50
             )
 
@@ -201,7 +231,7 @@ class Service(service.Service):
 
             self._reactor = reactor.listenSSL(
                 self.application.config["interface"]["http"]["tls"]["port"],
-                connectionLimitFactory,
+                httpThrottleFactory,
                 certificate.options(),
                 50
             )

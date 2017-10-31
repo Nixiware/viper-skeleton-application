@@ -1,7 +1,7 @@
 {
   "performance": {
     "//": "Application resource usage",
-    "threadPoolSize": 3
+    "threadPoolSize": 10
   },
   "interface": {
     "//": "Application communication interfaces",
@@ -14,12 +14,12 @@
       "tls": {
         "enabled": false,
         "port": 8001,
-        "//": "pem file must be a concatenation of the certificate and the private key (in that order)",
         "pem": ""
       },
       "connection": {
-        "timeout": 30,
-        "maximum": 100,
+        "timeout": 300,
+        "keepAlive": 5,
+        "maximum": 50,
         "maximumByPeer": 5
       }
     }
