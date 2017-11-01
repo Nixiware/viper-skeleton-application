@@ -14,7 +14,10 @@
       "tls": {
         "enabled": false,
         "port": 8001,
-        "pem": ""
+        "certificatePath": "",
+        "privateKeyPath": "",
+        "privateKeyPassphrase": "",
+        "certificateChainPaths": []
       },
       "connection": {
         "timeout": 300,

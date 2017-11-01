@@ -2,6 +2,8 @@ import json
 
 from zope.interface import directlyProvides, providedBy
 
+from OpenSSL import crypto
+
 from twisted.logger import Logger
 from twisted.internet import reactor, ssl
 from twisted.application import service
@@ -259,8 +261,8 @@ class Service(service.Service):
 
     def startService(self):
         # validating configuration
-        #if self.application.config["interface"]["http"]["connection"]["maximum"] < self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
-        #    raise ValueError("[HTTP]: You cannot set the total number of connections allowed lower than the total connections per peer.")
+        if self.application.config["interface"]["http"]["connection"]["maximum"] < self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
+            raise ValueError("[HTTP]: You cannot set the total number of connections allowed lower than the total connections per peer.")
 
         # creating HTTP factory
         httpFactory = HTTPFactory()
@@ -298,17 +300,42 @@ class Service(service.Service):
 
         # starting TLS (secure) http interface
         if self.application.config["interface"]["http"]["tls"]["enabled"]:
-            # loading certificate & private key
-            pemFile = open(self.application.config["interface"]["http"]["tls"]["pem"], "rb")
-            pemData = pemFile.read()
-            pemFile.close()
+            # loading certificate
+            certFile = open(self.application.config["interface"]["http"]["tls"]["certificatePath"], "rt")
+            certData = certFile.read()
+            certFile.close()
+            certificate = crypto.load_certificate(crypto.FILETYPE_PEM, certData)
 
-            certificate = ssl.PrivateCertificate.loadPEM(pemData)
+            # loading private key
+            privateKeyFile = open(self.application.config["interface"]["http"]["tls"]["privateKeyPath"], "rt")
+            privateKeyData = privateKeyFile.read()
+            privateKeyFile.close()
+
+            privateKeyPassphrase = None
+            if len(self.application.config["interface"]["http"]["tls"]["privateKeyPassphrase"]) > 0:
+                privateKeyPassphrase = self.application.config["interface"]["http"]["tls"]["privateKeyPassphrase"].encode()
+            privateKey = crypto.load_privatekey(crypto.FILETYPE_PEM, privateKeyData, privateKeyPassphrase)
+
+            # loading certificate chain
+            certChain = []
+            if len(self.application.config["interface"]["http"]["tls"]["certificateChainPaths"]) > 0:
+                for chainPath in self.application.config["interface"]["http"]["tls"]["certificateChainPaths"]:
+                    chainFile = open(chainPath, "rt")
+                    chainData = chainFile.read()
+                    chainFile.close()
+                    certChain.append(crypto.load_certificate(crypto.FILETYPE_PEM, chainData))
+
+            # creating the certificate options for reactor
+            certificateOptions = ssl.CertificateOptions(
+                certificate=certificate,
+                privateKey=privateKey,
+                extraCertChain=certChain
+            )
 
             self._reactor = reactor.listenSSL(
                 self.application.config["interface"]["http"]["tls"]["port"],
                 httpThrottleFactory,
-                certificate.options(),
+                certificateOptions,
                 50
             )
 
