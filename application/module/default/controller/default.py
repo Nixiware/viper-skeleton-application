@@ -7,6 +7,7 @@ class Controller(ViperController):
     def preDispatch(self):
         """Method is called (if defined) before the actual action is called."""
         self.articleModel = self.application.getModel("default.article")
+        self.nestedService = self.application.getService("default.nestedService")
 
     def createAction(self):
         """
@@ -38,6 +39,7 @@ class Controller(ViperController):
         def successCallback():
             self.responseCode = 200
             self.responseContent["articleInsert"] = True
+            self.responseContent["example"] = self.nestedService.performAction("test")
             self.sendFinalResponse()
 
         def failCallback():
