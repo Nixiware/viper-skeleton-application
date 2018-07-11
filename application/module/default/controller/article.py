@@ -44,7 +44,7 @@ class Controller(ViperController):
         def successCallback(articleID):
             self.responseCode = 200
             self.responseContent["articleID"] = articleID
-            self.responseContent["example"] = self.nestedService.performAction("test")
+            self.responseContent["serviceOutput"] = self.nestedService.performAction("articleCreate")
             self.sendFinalResponse()
 
         def failCallback():

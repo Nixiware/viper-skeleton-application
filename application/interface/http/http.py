@@ -46,6 +46,8 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
 
         :return: <void>
         """
+        super(HTTPRequest, self).setup()
+
         if self.channel is None:
             self.failRequestWithErrors(["CannotPerformRequest"])
             return
@@ -167,7 +169,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
     def sendFinalRequestResponse(self):
         def clearResponseCallback():
             # clearing response
-            self.requestResponse["code"] = 200
+            self.requestResponse["code"] = 0
             self.requestResponse["content"] = None
             self.requestResponse["errors"] = []
 

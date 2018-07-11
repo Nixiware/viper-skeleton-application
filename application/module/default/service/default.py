@@ -71,7 +71,7 @@ class Service:
         self.log.debug("[Default.Default] Recurring action ran.")
         sendMail = self.mailService.send(
             (
-                "admin@nixiware.com",
+                "admin@example.com",
             ),
             "Recurring action ran",
             "Hello Admin<br /><br />" \
