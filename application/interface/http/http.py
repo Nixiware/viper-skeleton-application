@@ -1,4 +1,8 @@
+import hmac
+import hashlib
 import json
+from calendar import timegm
+from datetime import datetime
 
 from OpenSSL import crypto
 
@@ -28,16 +32,30 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
     log = Logger()
 
     def process(self):
+        """
+        Dispatches the request processing to background thread.
+
+        :return: <void>
+        """
         reactor.callInThread(self.parseRequest)
 
     def parseRequest(self):
-        """Parse request received."""
+        """
+        Parses request by validating URL, decoding parameters, authenticating contents, and forwards the execution
+        to the application's dispatcher.
+
+        :return: <void>
+        """
+        if self.channel is None:
+            self.failRequestWithErrors(["CannotPerformRequest"])
+            return
+
         requestUri = self.path.decode()
         segmentsUri = requestUri.split("/")
 
         # validating URI
         if len(segmentsUri) != 3:
-            self.failRequestWithErrors(["InvalidRequestUri"])
+            self.failRequestWithErrors(["InvalidRequestUri", requestUri])
             return
 
         # request version
@@ -52,13 +70,59 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
 
         # request parameters
         requestParameters = {}
-        if (b"parameters" in self.args):
+        if b"parameters" in self.args:
             try:
                 requestParameters = json.loads(
                     self.args[b"parameters"][0].decode()
                 )
             except json.JSONDecodeError:
                 self.failRequestWithErrors(["InvalidParametersFormat"])
+                return
+
+        # performing message authentication using HMAC validation
+        if len(self.channel.application.config["interface"]["http"]["authentication"]["key"]) > 0:
+            # validating time
+            if b"time" not in self.args:
+                self.failRequestAuthenticationWithErrors(["SignatureTimeMissing"])
+                return
+
+            if len(self.args[b"time"][0].decode()) <= 0:
+                self.failRequestAuthenticationWithErrors(["SignatureTimeMissing"])
+                return
+
+            try:
+                requestSignatureTime = int(self.args[b"time"][0].decode())
+            except ValueError:
+                self.failRequestAuthenticationWithErrors(["SignatureTimeNotInteger"])
+                return
+
+            if abs(timegm(datetime.utcnow().utctimetuple()) - requestSignatureTime) > int(
+                    self.channel.application.config["interface"]["http"]["authentication"]["maximumTimeOffset"]):
+                self.failRequestAuthenticationWithErrors(["SignatureTimeExpired"])
+                return
+
+            # validating signature
+            if b"signature" not in self.args:
+                self.failRequestAuthenticationWithErrors(["SignatureMissing"])
+                return
+
+            if len(self.args[b"signature"][0].decode()) <= 0:
+                self.failRequestAuthenticationWithErrors(["SignatureMissing"])
+                return
+
+            requestParametersString = ""
+            if b"parameters" in self.args:
+                requestParametersString = self.args[b"parameters"][0].decode()
+
+            payloadSignature = "{}|{}".format(requestParametersString, requestSignatureTime)
+            signature = hmac.new(
+                self.channel.application.config["interface"]["http"]["authentication"]["key"].encode(),
+                payloadSignature.encode(),
+                digestmod=hashlib.sha512
+            )
+
+            if not hmac.compare_digest(signature.hexdigest(), self.args[b"signature"][0].decode()):
+                self.failRequestAuthenticationWithErrors(["SignatureInvalid"])
                 return
 
         # creating request payload
@@ -72,12 +136,21 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
             requestPayload
         )
 
+    def failRequestAuthenticationWithErrors(self, errors):
+        self.requestResponse["code"] = 401
+        self.requestResponse["content"] = None
+        self.requestResponse["errors"] += errors
+
+        self.sendFinalRequestResponse()
+
+    #
     # AbstractApplicationInterfaceProtocol
+    #
+
     def getIPAddress(self):
         return self.getClientIP()
 
     def requestPassedDispatcherValidation(self):
-        # method is called before request is passed to controller
         pass
 
     def failRequestWithErrors(self, errors):
@@ -88,7 +161,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
         self.sendFinalRequestResponse()
 
     def sendPartialRequestResponse(self):
-        # HTTP does not actually support partial response
+        # HTTP does not support partial response
         pass
 
     def sendFinalRequestResponse(self):
@@ -117,7 +190,7 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
                 if not keepAlive:
                     self.transport.loseConnection()
             except Exception as e:
-                self.log.debug("[HTTP]: Exception encountered while responding to request.")
+                self.log.error("[HTTP]: Error sendFinalRequestResponse(): {}".format(str(e)))
 
             clearResponseCallback()
 
@@ -140,6 +213,8 @@ class HTTPProtocol(HTTPChannel):
 
         Also by default the connection is not dropped when a timeout occurs, this method ensures
         that the request is completely cleared from the queue.
+
+        :return: <void>
         """
         if self.abortTimeout is not None:
             # We use self.callLater because that's what TimeoutMixin does.
@@ -152,6 +227,8 @@ class HTTPProtocol(HTTPChannel):
     def forceAbortClient(self):
         """
         Overriding HTTPChannel forceAbortClient to prevent logging pollution.
+
+        :return: <void>
         """
         self._abortingCall = None
         self.transport.abortConnection()
@@ -180,9 +257,18 @@ class Service(service.Service):
         self.application = application
 
     def startService(self):
+        """
+        Starts the HTTP/S interface and attaches it to the application.
+
+        :return: <void>
+        """
         # validating configuration
-        if self.application.config["interface"]["http"]["connection"]["maximum"] < self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
-            raise ValueError("[HTTP]: You cannot set the total number of connections allowed lower than the total connections per peer.")
+        if self.application.config["interface"]["http"]["connection"]["maximum"] < \
+                self.application.config["interface"]["http"]["connection"]["maximumByPeer"]:
+            raise ValueError(
+                "[HTTP]: You cannot set the total number of connections allowed lower than the total connections " \
+                "per peer."
+            )
 
         # creating HTTP factory
         httpFactory = HTTPFactory()
@@ -202,7 +288,8 @@ class Service(service.Service):
 
         # enabling connection peer limit policy
         httpConnectionLimitFactory = LimitConnectionsByPeer(httpTimeoutFactory)
-        httpConnectionLimitFactory.maxConnectionsPerPeer = self.application.config["interface"]["http"]["connection"]["maximumByPeer"]
+        httpConnectionLimitFactory.maxConnectionsPerPeer = \
+            self.application.config["interface"]["http"]["connection"]["maximumByPeer"]
 
         # enabling throttle policy
         httpThrottleFactory = ThrottlingFactory(
@@ -233,7 +320,8 @@ class Service(service.Service):
 
             privateKeyPassphrase = None
             if len(self.application.config["interface"]["http"]["tls"]["privateKeyPassphrase"]) > 0:
-                privateKeyPassphrase = self.application.config["interface"]["http"]["tls"]["privateKeyPassphrase"].encode()
+                privateKeyPassphrase = \
+                    self.application.config["interface"]["http"]["tls"]["privateKeyPassphrase"].encode()
             privateKey = crypto.load_privatekey(crypto.FILETYPE_PEM, privateKeyData, privateKeyPassphrase)
 
             # loading certificate chain
@@ -260,4 +348,9 @@ class Service(service.Service):
             )
 
     def stopService(self):
-        return self._reactor.stopListening()
+        """
+        Stops the HTTP/S interface and deattaches it from the application.
+
+        :return: <void>
+        """
+        self._reactor.stopListening()

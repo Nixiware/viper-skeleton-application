@@ -1,11 +1,12 @@
 {
   "performance": {
-    "//": "Application resource usage",
-    "threadPoolSize": 10
+    "//": "Application resources",
+    "threadPoolSize": 16
   },
   "interface": {
     "//": "Application communication interfaces",
     "http": {
+      "//": "HTTP JSON interface",
       "ip": "127.0.0.1",
       "default": {
         "enabled": false,
@@ -24,20 +25,15 @@
         "keepAlive": 5,
         "maximum": 50,
         "maximumByPeer": 5
+      },
+      "authentication": {
+        "key": "",
+        "maximumTimeOffset": 0
       }
     }
   },
-  "mail": {
-    "//": "SMTP server used for emails",
-    "from": "",
-    "name": "",
-    "host": "",
-    "port": 0,
-    "username": "",
-    "password": ""
-  },
   "database": {
-    "//": "MySQL database server used for local storage",
+    "//": "Viper MySQL database service",
     "host": "",
     "port": 3306,
     "username": "",
@@ -46,5 +42,14 @@
     "charset": "utf8",
     "connectionsMinimum": 3,
     "connectionsMaximum": 5
+  },
+  "mail": {
+    "//": "Viper SMTP mail service",
+    "from": "",
+    "name": "",
+    "host": "",
+    "port": 0,
+    "username": "",
+    "password": ""
   }
 }

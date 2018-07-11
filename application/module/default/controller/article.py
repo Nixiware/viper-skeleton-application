@@ -5,20 +5,25 @@ from nx.viper.controller import Controller as ViperController
 
 class Controller(ViperController):
     def preDispatch(self):
-        """Method is called (if defined) before the actual action is called."""
+        """
+        Optional method called before the action is dispatched.
+
+        :return: <void>
+        """
         self.articleModel = self.application.getModel("default.article")
         self.nestedService = self.application.getService("default.nestedService")
 
     def createAction(self):
         """
-        Demo create article REST API method.
+        Demo REST API method for creating a new article.
 
         * input validation
         * API versioning
         * response success handler
         * response fail handler
-        """
 
+        :return: <void>
+        """
         # performing input validation
         isValid = True
         if "title" not in self.requestParameters:
@@ -35,10 +40,10 @@ class Controller(ViperController):
             self.sendFinalResponse()
             return
 
-        # define success & fail callbacks
-        def successCallback():
+        # define success and fail callbacks
+        def successCallback(articleID):
             self.responseCode = 200
-            self.responseContent["articleInsert"] = True
+            self.responseContent["articleID"] = articleID
             self.responseContent["example"] = self.nestedService.performAction("test")
             self.sendFinalResponse()
 
@@ -49,15 +54,19 @@ class Controller(ViperController):
         if self.requestVersion == 1.1:
             # perform article creation
             self.articleModel.createArticle(
-                self.requestParameters["title"],
-                datetime.datetime.now(),
-                self.requestProtocol.getIPAddress(),
                 successCallback,
-                failCallback
+                failCallback,
+                title=self.requestParameters["title"],
+                date=datetime.datetime.utcnow(),
+                ip=self.requestProtocol.getIPAddress()
             )
         else:
             failCallback()
 
     def postDispatch(self):
-        """Method is called (if defined) after the actual action is called."""
+        """
+        Optional method called after the action is dispatched.
+
+        :return:
+        """
         pass

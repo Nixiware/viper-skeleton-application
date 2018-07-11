@@ -6,4 +6,4 @@ class Service:
         self.requiredComponent = RequiredComponent()
 
     def performAction(self, string):
-        return "{}.{}".format(string, string)
+        return self.application.config["defaultFormat"].format(string, string)

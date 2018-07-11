@@ -1,4 +1,4 @@
-nx.viper==1.0.0a6
+nx.viper==1.0.0a7
 pyOpenSSL
 ndg-httpsclient
 pyasn1
