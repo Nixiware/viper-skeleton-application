@@ -45,11 +45,12 @@
   },
   "mail": {
     "//": "Viper SMTP mail service",
-    "from": "",
-    "name": "",
     "host": "",
     "port": 0,
+    "tls": true,
     "username": "",
-    "password": ""
+    "password": "",
+    "from": "",
+    "name": ""
   }
 }

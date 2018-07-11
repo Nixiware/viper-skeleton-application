@@ -29,7 +29,7 @@ class Service:
         """
         Method called when application completed startup process.
 
-        :param data:
+        :param data: <object> event data object
         :return: <void>
         """
         self.pendingApplicationShutdown = False
@@ -45,13 +45,13 @@ class Service:
         """
         Method to run when the application is asked to close.
 
-        :param data:
+        :param data: <object> event data object
         :return: <void>
         """
         self.pendingApplicationShutdown = True
 
         try:
-            if self.recurringAction is not None:
+            if hasattr(self, "recurringAction") and self.recurringAction is not None:
                 self.recurringAction.stop()
         except Exception:
             pass
@@ -69,3 +69,11 @@ class Service:
         # performing time consuming task
         sleep(2.5)
         self.log.debug("[Default.Default] Recurring action ran.")
+        sendMail = self.mailService.send(
+            (
+                "admin@nixiware.com",
+            ),
+            "Recurring action ran",
+            "Hello Admin<br /><br />" \
+            "Recurring action ran successfully."
+        )
