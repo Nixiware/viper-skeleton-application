@@ -175,29 +175,40 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
 
         def sendResponseCallback():
             try:
-                # sending response and closing connection
+                # sending response
                 self.setResponseCode(200, "OK".encode())
                 self.setHeader("Content-Type", "application/json")
                 self.write(json.dumps(
                     self.requestResponse,
                     sort_keys=True
                 ).encode())
-
-                # preparing request finish
-                keepAlive = True
-                if self.channel.application.config["interface"]["http"]["connection"]["keepAlive"] == 0:
-                    keepAlive = False
-
-                self.finish()
-                if not keepAlive:
-                    self.transport.loseConnection()
             except Exception as e:
+                self.setResponseCode(500, "Internal Server Error".encode())
+                self.setHeader("Content-Type", "application/json")
+                self.write(json.dumps(
+                    {
+                        "code": 500,
+                        "content": None,
+                        "errors": []
+                    },
+                    sort_keys=True
+                ).encode())
+
                 self.log.error("[HTTP]: Error sendFinalRequestResponse(): {}".format(str(e)))
+
+            # closing connection
+            keepAlive = True
+            if self.channel.application.config["interface"]["http"]["connection"]["keepAlive"] == 0:
+                keepAlive = False
+
+            self.finish()
+            if not keepAlive:
+                self.transport.loseConnection()
 
             clearResponseCallback()
 
         # checking if any of the enabled policies closed the channel
-        if self.channel is not None:
+        if hasattr(self, "channel") and self.channel is not None:
             reactor.callFromThread(sendResponseCallback)
         else:
             clearResponseCallback()

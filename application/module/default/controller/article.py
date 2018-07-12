@@ -4,6 +4,15 @@ from nx.viper.controller import Controller as ViperController
 
 
 class Controller(ViperController):
+    """
+    Basic CRUD example.
+
+    * input validation
+    * API versioning
+    * responding successfully
+    * handling failures
+    """
+
     def preDispatch(self):
         """
         Optional method called before the action is dispatched.
@@ -15,12 +24,7 @@ class Controller(ViperController):
 
     def createAction(self):
         """
-        Demo REST API method for creating a new article.
-
-        * input validation
-        * API versioning
-        * response success handler
-        * response fail handler
+        Create new article in persistent storage.
 
         :return: <void>
         """
@@ -43,17 +47,22 @@ class Controller(ViperController):
         # define success and fail callbacks
         def successCallback(articleID):
             self.responseCode = 200
-            self.responseContent["articleID"] = articleID
+            self.responseContent["article_id"] = articleID
+
+            # example of accessing module service, getting data from it, and showing response
             self.responseContent["serviceOutput"] = self.nestedService.performAction("articleCreate")
+
             self.sendFinalResponse()
 
-        def failCallback():
+        def failCallback(errors):
             self.responseCode = 400
+            self.responseErrors.extend(errors)
             self.sendFinalResponse()
 
+        # checking request version
         if self.requestVersion == 1.1:
             # perform article creation
-            self.articleModel.createArticle(
+            self.articleModel.create(
                 successCallback,
                 failCallback,
                 title=self.requestParameters["title"],
@@ -61,7 +70,142 @@ class Controller(ViperController):
                 ip=self.requestProtocol.getIPAddress()
             )
         else:
-            failCallback()
+            failCallback(["UnsupportedRequestVersion"])
+
+    def getAction(self):
+        """
+        Read article from persistent storage.
+
+        :return: <void>
+        """
+        isValid = True
+        if "article_id" not in self.requestParameters:
+            isValid = False
+            self.responseErrors.append("article_id.IsEmpty")
+        elif not isinstance(self.requestParameters["article_id"], int):
+            isValid = False
+            self.responseErrors.append("article_id.NotInt")
+
+        if not isValid:
+            self.responseCode = 400
+            self.responseContent = None
+            self.sendFinalResponse()
+            return
+
+        def successCallback(article):
+            self.responseCode = 200
+            self.responseContent["article"] = {
+                "article_id": article["article_id"],
+                "title": article["title"],
+                "date": article["date"].strftime("%Y-%m-%d %H:%M:%S")
+            }
+            self.sendFinalResponse()
+
+        def failCallback(errors):
+            self.responseCode = 400
+            self.responseErrors.extend(errors)
+            self.sendFinalResponse()
+
+        self.articleModel.get(
+            ("article_id", "=", self.requestParameters["article_id"]),
+            successCallback,
+            failCallback
+        )
+
+    def updateAction(self):
+        """
+        Update existing article from persistent storage.
+
+        :return: <void>
+        """
+        # performing input validation
+        isValid = True
+        if "article_id" not in self.requestParameters:
+            isValid = False
+            self.responseErrors.append("article_id.IsEmpty")
+        elif not isinstance(self.requestParameters["article_id"], int):
+            isValid = False
+            self.responseErrors.append("article_id.NotInt")
+
+        if "title" not in self.requestParameters:
+            isValid = False
+            self.responseErrors.append("title.IsEmpty")
+        elif not isinstance(self.requestParameters["title"], str):
+            isValid = False
+            self.responseErrors.append("title.NotString")
+
+        if not isValid:
+            self.responseCode = 400
+            self.responseContent = None
+            self.sendFinalResponse()
+            return
+
+        def successCallback():
+            self.responseCode = 200
+            self.sendFinalResponse()
+
+        def failCallback(errors):
+            self.responseCode = 400
+            self.responseErrors.extend(errors)
+            self.sendFinalResponse()
+
+        def updateCallback(article):
+            self.articleModel.update(
+                ("article_id", "=", self.requestParameters["article_id"]),
+                successCallback,
+                failCallback,
+                title=self.requestParameters["title"]
+            )
+
+        # checking if article exists before performing update
+        self.articleModel.get(
+            ("article_id", "=", self.requestParameters["article_id"]),
+            updateCallback,
+            failCallback
+        )
+
+    def deleteAction(self):
+        """
+        Delete existing article from persistent storage.
+
+        :return:
+        """
+        isValid = True
+        if "article_id" not in self.requestParameters:
+            isValid = False
+            self.responseErrors.append("article_id.IsEmpty")
+        elif not isinstance(self.requestParameters["article_id"], int):
+            isValid = False
+            self.responseErrors.append("article_id.NotInt")
+
+        if not isValid:
+            self.responseCode = 400
+            self.responseContent = None
+            self.sendFinalResponse()
+            return
+
+        def successCallback():
+            self.responseCode = 200
+            self.sendFinalResponse()
+
+        def failCallback(errors):
+            self.responseCode = 400
+            self.responseErrors.extend(errors)
+            self.sendFinalResponse()
+
+        def deleteCallback(article):
+            self.articleModel.delete(
+                ("article_id", "=", self.requestParameters["article_id"]),
+                successCallback,
+                failCallback
+            )
+
+        # checking if article exists before deletion
+        self.articleModel.get(
+            ("article_id", "=", self.requestParameters["article_id"]),
+            deleteCallback,
+            failCallback
+        )
 
     def postDispatch(self):
         """

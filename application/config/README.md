@@ -1,4 +1,4 @@
-About this directory
+Config directory
 =====================
 
 By default, this application is configured to load all configs in `./application/config/{,*.}{global,local}.json`. 

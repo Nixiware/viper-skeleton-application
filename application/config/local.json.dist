@@ -32,7 +32,7 @@
       }
     }
   },
-  "database": {
+  "viper.mysql": {
     "//": "Viper MySQL database service",
     "host": "",
     "port": 3306,
@@ -43,7 +43,7 @@
     "connectionsMinimum": 3,
     "connectionsMaximum": 5
   },
-  "mail": {
+  "viper.mail": {
     "//": "Viper SMTP mail service",
     "host": "",
     "port": 0,
