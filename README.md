@@ -3,19 +3,35 @@ Viper skeleton application
 
 Introduction
 ------------
-Serves as a skeleton application for the nx.viper framework package.
-It is meant to be used as a starting point for any project.
+Serves as a skeleton application for the [nx.viper](https://github.com/Nixiware/viper) framework.
+It is meant to be used as a starting point for projects.
 
 Requirements
 ------------
-* Python 3
-* MySQL 5.5 / MariaDB 10
+* nx.viper
+* Python 3.6
 
-Known issues
+Optional
+
+* MySQL / MariaDB
+* SMTP server
+
+Features
 ------------
-1. The example HTTP interface does not work reliable over TLS. The connection is performed succesfuly in Chrome, Safari and Postman, but it fails in Firefox and older versions of curl / openssl.
-This issue is triggered when additional chain certificates are included in the TLS options. 
+
+
+
+Usage
+------------
+
+
+Deployment
+------------
+
+```
+/home/application/viper-skeleton-application/venv/bin/twistd -l log/application.log -y service.tac --nodaemon --pidfile=viper-skeleton-application.pid
+```
 
 Notice
 ------------
-Viper is currently in Alpha stage.
+Viper is currently in Beta stage.
