@@ -244,7 +244,12 @@ class HTTPProtocol(HTTPChannel):
         :return: <void>
         """
         self._abortingCall = None
-        self.transport.abortConnection()
+
+        try:
+            self.transport.abortConnection()
+        except:
+            # connection is already ended
+            pass
 
 
 class HTTPFactory(HTTPFactory):
