@@ -8,6 +8,7 @@
     "http": {
       "//": "HTTP JSON interface",
       "ip": "127.0.0.1",
+      "ipv6": false,
       "default": {
         "enabled": false,
         "port": 8000
@@ -21,6 +22,7 @@
         "certificateChainPaths": []
       },
       "connection": {
+        "queueSize": 50,
         "timeout": 300,
         "keepAlive": 5,
         "maximum": 50,

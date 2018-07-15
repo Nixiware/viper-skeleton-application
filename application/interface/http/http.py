@@ -315,13 +315,26 @@ class Service(service.Service):
             self.application.config["interface"]["http"]["connection"]["maximum"]
         )
 
+        # restricting to a single network interface
+        interfaceIP = ""
+        if "ip" in self.application.config["interface"]["http"] and \
+            len(self.application.config["interface"]["http"]["ip"]) > 0:
+            interfaceIP = self.application.config["interface"]["http"]["ip"]
+
+        # binding to all IPv6 network interfaces
+        startListenIterations = 1
+        if interfaceIP == "" and self.application.config["interface"]["http"]["ipv6"]:
+            startListenIterations = 2
+
         # starting default (unsecure) http interface
         if self.application.config["interface"]["http"]["default"]["enabled"]:
-            self._reactor = reactor.listenTCP(
-                self.application.config["interface"]["http"]["default"]["port"],
-                httpThrottleFactory,
-                50
-            )
+            for i in range(startListenIterations):
+                self._reactor = reactor.listenTCP(
+                    self.application.config["interface"]["http"]["default"]["port"],
+                    httpThrottleFactory,
+                    self.application.config["interface"]["http"]["connection"]["queueSize"],
+                    interfaceIP
+                )
 
         # starting TLS (secure) http interface
         if self.application.config["interface"]["http"]["tls"]["enabled"]:
@@ -358,12 +371,14 @@ class Service(service.Service):
                 extraCertChain=certChain
             )
 
-            self._reactor = reactor.listenSSL(
-                self.application.config["interface"]["http"]["tls"]["port"],
-                httpThrottleFactory,
-                certificateOptions,
-                50
-            )
+            for i in range(startListenIterations):
+                self._reactor = reactor.listenSSL(
+                    self.application.config["interface"]["http"]["tls"]["port"],
+                    httpThrottleFactory,
+                    certificateOptions,
+                    self.application.config["interface"]["http"]["connection"]["queueSize"],
+                    interfaceIP
+                )
 
     def stopService(self):
         """
