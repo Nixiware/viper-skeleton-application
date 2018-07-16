@@ -315,17 +315,6 @@ class Service(service.Service):
             self.application.config["interface"]["http"]["connection"]["maximum"]
         )
 
-        # restricting to a single network interface
-        interfaceIP = ""
-        if "ip" in self.application.config["interface"]["http"] and \
-            len(self.application.config["interface"]["http"]["ip"]) > 0:
-            interfaceIP = self.application.config["interface"]["http"]["ip"]
-
-        # binding to all IPv6 network interfaces
-        startListenIterations = 1
-        if interfaceIP == "" and self.application.config["interface"]["http"]["ipv6"]:
-            startListenIterations = 2
-
         # starting default (unsecure) http interface
         if self.application.config["interface"]["http"]["default"]["enabled"]:
             if len(self.application.config["interface"]["http"]["ip"]) == 0:
