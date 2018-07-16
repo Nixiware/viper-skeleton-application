@@ -10,7 +10,7 @@ class Model:
 
     def __init__(self, application):
         self.application = application
-        self.dbService = self.application.getService("viper.database")
+        self.dbService = self.application.getService("viper.mysql")
 
     def get(self, predicate, successHandler, failHandler=None):
         """
