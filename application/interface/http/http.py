@@ -328,13 +328,20 @@ class Service(service.Service):
 
         # starting default (unsecure) http interface
         if self.application.config["interface"]["http"]["default"]["enabled"]:
-            for i in range(startListenIterations):
+            if len(self.application.config["interface"]["http"]["ip"]) == 0:
                 self._reactor = reactor.listenTCP(
                     self.application.config["interface"]["http"]["default"]["port"],
                     httpThrottleFactory,
-                    self.application.config["interface"]["http"]["connection"]["queueSize"],
-                    interfaceIP
+                    self.application.config["interface"]["http"]["connection"]["queueSize"]
                 )
+            else:
+                for interfaceIP in self.application.config["interface"]["http"]["ip"]:
+                    self._reactor = reactor.listenTCP(
+                        self.application.config["interface"]["http"]["default"]["port"],
+                        httpThrottleFactory,
+                        self.application.config["interface"]["http"]["connection"]["queueSize"],
+                        interfaceIP
+                    )
 
         # starting TLS (secure) http interface
         if self.application.config["interface"]["http"]["tls"]["enabled"]:
@@ -371,14 +378,23 @@ class Service(service.Service):
                 extraCertChain=certChain
             )
 
-            for i in range(startListenIterations):
+            if len(self.application.config["interface"]["http"]["ip"]) == 0:
                 self._reactor = reactor.listenSSL(
                     self.application.config["interface"]["http"]["tls"]["port"],
                     httpThrottleFactory,
                     certificateOptions,
-                    self.application.config["interface"]["http"]["connection"]["queueSize"],
-                    interfaceIP
+                    self.application.config["interface"]["http"]["connection"]["queueSize"]
                 )
+            else:
+                for interfaceIP in self.application.config["interface"]["http"]["ip"]:
+                    self._reactor = reactor.listenSSL(
+                        self.application.config["interface"]["http"]["tls"]["port"],
+                        httpThrottleFactory,
+                        certificateOptions,
+                        self.application.config["interface"]["http"]["connection"]["queueSize"],
+                        interfaceIP
+                    )
+
 
     def stopService(self):
         """

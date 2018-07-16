@@ -7,8 +7,7 @@
     "//": "Application communication interfaces",
     "http": {
       "//": "HTTP JSON interface",
-      "ip": "127.0.0.1",
-      "ipv6": false,
+      "ip": [],
       "default": {
         "enabled": false,
         "port": 8000
