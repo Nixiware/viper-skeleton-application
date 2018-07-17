@@ -94,7 +94,7 @@ class Model:
             if failHandler is not None:
                 reactor.callInThread(failHandler, ["DatabaseError"])
 
-        def createCallback(transaction, successHandler, failHandler, **kwargs):
+        def createCallback(transaction, successHandler, **kwargs):
             # create query
             queryInsert = "INSERT INTO `article_article` ("
             if len(kwargs) > 0:
@@ -106,8 +106,8 @@ class Model:
                         queryInsert = "{}, ".format(queryInsert)
                     count += 1
             else:
-                if failHandler is not None:
-                    reactor.callInThread(failHandler)
+                failCallback("No kwargs specified.")
+                return
 
             # add parameters from kwargs
             queryInsert = "{}) VALUES (".format(queryInsert)
@@ -145,13 +145,12 @@ class Model:
                     articleID = results[0][0]
             except Exception as e:
                 failCallback(e)
-
                 return
 
             if successHandler is not None:
                 reactor.callInThread(successHandler, articleID)
 
-        interaction = self.dbService.runInteraction(createCallback, successHandler, failHandler, **kwargs)
+        interaction = self.dbService.runInteraction(createCallback, successHandler, **kwargs)
         interaction.addErrback(failCallback)
 
     def update(self, predicate, successHandler=None, failHandler=None, **kwargs):

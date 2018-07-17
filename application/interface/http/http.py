@@ -183,18 +183,24 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
                     sort_keys=True
                 ).encode())
             except Exception as e:
-                self.setResponseCode(500, "Internal Server Error".encode())
-                self.setHeader("Content-Type", "application/json")
-                self.write(json.dumps(
-                    {
-                        "code": 500,
-                        "content": None,
-                        "errors": []
-                    },
-                    sort_keys=True
-                ).encode())
+                try:
+                    self.setResponseCode(500, "Internal Server Error".encode())
+                    self.setHeader("Content-Type", "application/json")
+                    self.write(json.dumps(
+                        {
+                            "code": 500,
+                            "content": None,
+                            "errors": []
+                        },
+                        sort_keys=True
+                    ).encode())
 
-                self.log.error("[HTTP]: Error sendFinalRequestResponse(): {}".format(str(e)))
+                    self.log.error("[HTTP]: Error sendFinalRequestResponse(): {error}", error=str(e))
+                except Exception as e:
+                    self.log.error(
+                        "[HTTP]: Error sendFinalRequestResponse(): Cannot send 500: {error}",
+                        error=str(e)
+                    )
 
             # closing connection
             keepAlive = True
