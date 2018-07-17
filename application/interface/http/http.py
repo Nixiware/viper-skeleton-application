@@ -148,7 +148,6 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
     #
     # AbstractApplicationInterfaceProtocol
     #
-
     def getIPAddress(self):
         return self.getClientIP()
 
