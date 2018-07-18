@@ -202,9 +202,10 @@ class HTTPRequest(AbstractApplicationInterfaceProtocol, Request):
                     )
 
             # closing connection
-            keepAlive = True
-            if self.channel.application.config["interface"]["http"]["connection"]["keepAlive"] == 0:
-                keepAlive = False
+            keepAlive = False
+            if hasattr(self, "channel") and self.channel is not None \
+                    and self.channel.application.config["interface"]["http"]["connection"]["keepAlive"] != 0:
+                keepAlive = True
 
             self.finish()
             if not keepAlive:
