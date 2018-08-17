@@ -1,0 +1,57 @@
+{
+  "performance": {
+    "//": "Application resources",
+    "threadPoolSize": 16
+  },
+  "interface": {
+    "//": "Application communication interfaces",
+    "http": {
+      "//": "HTTP JSON interface",
+      "ip": [],
+      "default": {
+        "enabled": true,
+        "port": 8000
+      },
+      "tls": {
+        "enabled": false,
+        "port": 8001,
+        "certificatePath": "",
+        "privateKeyPath": "",
+        "privateKeyPassphrase": "",
+        "certificateChainPaths": []
+      },
+      "connection": {
+        "queueSize": 50,
+        "timeout": 300,
+        "keepAlive": 5,
+        "maximum": 50,
+        "maximumByPeer": 5
+      },
+      "authentication": {
+        "key": "",
+        "maximumTimeOffset": 0
+      }
+    }
+  },
+  "viper.mysql": {
+    "//": "Viper MySQL database service",
+    "host": "database",
+    "port": 3306,
+    "username": "viper",
+    "password": "__FILE__viper_db_password",
+    "name": "viper",
+    "charset": "utf8",
+    "connectionsMinimum": 3,
+    "connectionsMaximum": 5
+  },
+  "viper.mail": {
+    "//": "Viper SMTP mail service",
+    "host": "",
+    "port": 0,
+    "tls": true,
+    "username": "",
+    "password": "",
+    "from": "",
+    "name": ""
+  }
+}
