@@ -1,0 +1,67 @@
+version: "3.2"
+
+secrets:
+  db_root_password:
+    external: true
+  viper_db_password:
+    external: true
+
+volumes:
+  app-log:
+    driver: local
+  app-data:
+    driver: local
+  db-mysql:
+    driver: local
+
+networks:
+  public:
+  private:
+
+services:
+  application:
+    image: viper:latest
+    depends_on:
+      - "database"
+    ports:
+      - "8000:8000"
+    networks:
+      - public
+      - private
+    secrets:
+      - viper_db_password
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/viper_db_password
+    volumes:
+      - type: bind
+        source: ./
+        target: /home/application/source
+      - type: volume
+        source: app-log
+        target: /home/application/log
+      - type: volume
+        source: app-log
+        target: /home/application/source/data
+
+  database:
+    image: mysql:5.7
+    networks:
+      - private
+    secrets:
+      - db_root_password
+      - viper_db_password
+    environment:
+      MYSQL_DATABASE: viper
+      MYSQL_USER: viper
+      MYSQL_PASSWORD_FILE: /run/secrets/viper_db_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    volumes:
+      - type: bind
+        source: ./script/sql/base.sql
+        target: /docker-entrypoint-initdb.d/0-base.sql
+      - type: bind
+        source: ./script/sql/up.sql
+        target: /docker-entrypoint-initdb.d/1-up.sql
+      - type: volume
+        source: db-mysql
+        target: /var/lib/mysql

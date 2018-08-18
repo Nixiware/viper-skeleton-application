@@ -38,7 +38,7 @@
     "host": "database",
     "port": 3306,
     "username": "viper",
-    "password": "__FILE__viper_db_password",
+    "password": "__FILE__DB_PASSWORD_FILE",
     "name": "viper",
     "charset": "utf8",
     "connectionsMinimum": 3,
@@ -46,12 +46,12 @@
   },
   "viper.mail": {
     "//": "Viper SMTP mail service",
-    "host": "",
-    "port": 0,
-    "tls": true,
-    "username": "",
-    "password": "",
-    "from": "",
-    "name": ""
+    "host": "__ENV__MAIL_HOST",
+    "port": "__ENV__INT__MAIL_PORT",
+    "tls": "__ENV__BOOL__MAIL_TLS",
+    "username": "__ENV__MAIL_USERNAME",
+    "password": "__ENV__MAIL_PASSWORD",
+    "from": "__ENV__MAIL_FROM",
+    "name": "__ENV__MAIL_NAME"
   }
 }

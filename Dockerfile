@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # installing required packages
 RUN apt-get update && \
-    apt-get install -y python-dev python3-pip
+    apt-get install -y python3-pip
 
 # creating user
 RUN useradd application -m
@@ -16,10 +16,11 @@ WORKDIR /home/application/source
 ADD . /home/application/source
 
 # installing dependencies
+RUN pip3 install https://github.com/Nixiware/viper/archive/docker.zip
 RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
 
 # exposing HTTP port
-EXPOSE 8001
+EXPOSE 8000
 
 # starting Twistd in foreground
-CMD twistd -l /home/application/log/application.log -y service.tac --nodaemon --pidfile=stiricurate-proxy.pid
+CMD twistd -l /home/application/log/application.log -y service.tac --nodaemon --pidfile=
