@@ -16,7 +16,6 @@ WORKDIR /home/application/source
 ADD . /home/application/source
 
 # installing dependencies
-RUN pip3 install https://github.com/Nixiware/viper/archive/docker.zip
 RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
 
 # exposing HTTP port
