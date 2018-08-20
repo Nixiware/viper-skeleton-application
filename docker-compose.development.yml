@@ -40,7 +40,7 @@ services:
         source: app-log
         target: /home/application/log
       - type: volume
-        source: app-log
+        source: app-data
         target: /home/application/source/data
 
   database:
