@@ -35,14 +35,21 @@
   },
   "viper.mysql": {
     "//": "Viper MySQL database service",
-    "host": "database",
+    "host": "__ENV__DB_HOST",
     "port": 3306,
     "username": "viper",
     "password": "__FILE__DB_PASSWORD_FILE",
     "name": "viper",
     "charset": "utf8",
     "connectionsMinimum": 3,
-    "connectionsMaximum": 5
+    "connectionsMaximum": 5,
+    "init": {
+      "runIfEmpty": true,
+      "scripts": [
+        "script/sql/base.sql",
+        "script/sql/up.sql"
+      ]
+    }
   },
   "viper.mail": {
     "//": "Viper SMTP mail service",

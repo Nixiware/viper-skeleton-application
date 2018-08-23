@@ -42,7 +42,14 @@
     "name": "",
     "charset": "utf8",
     "connectionsMinimum": 3,
-    "connectionsMaximum": 5
+    "connectionsMaximum": 5,
+    "init": {
+      "runIfEmpty": true,
+      "scripts": [
+        "script/sql/base.sql",
+        "script/sql/up.sql"
+      ]
+    }
   },
   "viper.mail": {
     "//": "Viper SMTP mail service",
