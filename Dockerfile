@@ -1,32 +1,32 @@
-FROM ubuntu:latest
+FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
 ENV DB_HOST=database
 
-# installing required packages
+# install required packages
 RUN apt-get update && \
     apt-get install -y netcat-traditional python3-pip
 
-# creating user
+# create user
 RUN useradd application -m
 RUN mkdir /home/application/source
 RUN mkdir /home/application/log
 
-# adding source files
+# add source files
 WORKDIR /home/application/source
 ADD . /home/application/source
 
-# installing dependencies
+# install dependencies
 RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
 
-# exposing HTTP port
+# expose HTTP port
 EXPOSE 8000
 
-# running start script
+# run start script
 COPY script/container/run.sh /run.sh
 RUN chmod 755 /run.sh
 ENTRYPOINT ["/run.sh"]
 
-# starting Twistd in foreground
+# start Twistd in foreground
 CMD twistd -l /home/application/log/application.log -y service.tac --nodaemon --pidfile=

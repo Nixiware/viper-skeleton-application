@@ -61,7 +61,7 @@ services:
         target: /var/lib/mysql
 
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin
+    image: phpmyadmin/phpmyadmin:4.7
     depends_on:
       - "database"
     ports:

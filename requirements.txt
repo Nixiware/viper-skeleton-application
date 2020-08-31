@@ -1,5 +1,5 @@
-nx.viper==1.2.3b5
-pyOpenSSL
-ndg-httpsclient
-pyasn1
-service_identity
+nx.viper==1.2.4b1
+pyOpenSSL==19.1.0
+ndg-httpsclient==0.5.1
+pyasn1==0.4.8
+service_identity==18.1.0

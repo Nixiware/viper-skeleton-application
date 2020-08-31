@@ -19,7 +19,7 @@ class Controller(ViperController):
 
         :return: <void>
         """
-        self.articleModel = self.application.getModel("default.article")
+        self.articleService = self.application.getService("default.article")
         self.nestedService = self.application.getService("default.nestedService")
 
     def createAction(self):
@@ -62,7 +62,7 @@ class Controller(ViperController):
         # checking request version
         if self.requestVersion == 1.1:
             # perform article creation
-            self.articleModel.create(
+            self.articleService.create(
                 successCallback,
                 failCallback,
                 title=self.requestParameters["title"],
@@ -95,9 +95,9 @@ class Controller(ViperController):
         def successCallback(article):
             self.responseCode = 200
             self.responseContent["article"] = {
-                "article_id": article["article_id"],
-                "title": article["title"],
-                "date": article["date"].strftime("%Y-%m-%d %H:%M:%S")
+                "article_id": article.identifier,
+                "title": article.title,
+                "date": article.date.strftime("%Y-%m-%d %H:%M:%S")
             }
             self.sendFinalResponse()
 
@@ -106,7 +106,7 @@ class Controller(ViperController):
             self.responseErrors.extend(errors)
             self.sendFinalResponse()
 
-        self.articleModel.get(
+        self.articleService.get(
             ("article_id", "=", self.requestParameters["article_id"]),
             successCallback,
             failCallback
@@ -150,7 +150,7 @@ class Controller(ViperController):
             self.sendFinalResponse()
 
         def updateCallback(article):
-            self.articleModel.update(
+            self.articleService.update(
                 ("article_id", "=", self.requestParameters["article_id"]),
                 successCallback,
                 failCallback,
@@ -158,7 +158,7 @@ class Controller(ViperController):
             )
 
         # checking if article exists before performing update
-        self.articleModel.get(
+        self.articleService.get(
             ("article_id", "=", self.requestParameters["article_id"]),
             updateCallback,
             failCallback
@@ -194,14 +194,14 @@ class Controller(ViperController):
             self.sendFinalResponse()
 
         def deleteCallback(article):
-            self.articleModel.delete(
+            self.articleService.delete(
                 ("article_id", "=", self.requestParameters["article_id"]),
                 successCallback,
                 failCallback
             )
 
         # checking if article exists before deletion
-        self.articleModel.get(
+        self.articleService.get(
             ("article_id", "=", self.requestParameters["article_id"]),
             deleteCallback,
             failCallback
