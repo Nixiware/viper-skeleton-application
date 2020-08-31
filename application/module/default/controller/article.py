@@ -102,7 +102,10 @@ class Controller(ViperController):
             self.sendFinalResponse()
 
         def failCallback(errors):
-            self.responseCode = 400
+            if "ArticleNotFound" in errors:
+                self.responseCode = 404
+            else:
+                self.responseCode = 400
             self.responseErrors.extend(errors)
             self.sendFinalResponse()
 
